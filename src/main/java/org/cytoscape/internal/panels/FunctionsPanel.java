@@ -16,7 +16,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.logging.Logger;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -24,7 +23,6 @@ import javax.swing.table.DefaultTableModel;
 import org.cytoscape.application.CyApplicationManager;
 import org.cytoscape.application.swing.CytoPanelComponent;
 import org.cytoscape.application.swing.CytoPanelName;
-import org.cytoscape.internal.load.LoadManager;
 import org.cytoscape.internal.utils.FileUtils;
 import org.cytoscape.model.CyEdge;
 import org.cytoscape.model.CyNetwork;
@@ -33,7 +31,6 @@ import org.cytoscape.model.CyTableUtil;
 import org.cytoscape.internal.boolnet.functions.FunctionsManager;
 import org.cytoscape.internal.utils.PopupMessage;
 import org.cytoscape.internal.utils.TableUtils;
-import org.cytoscape.session.CySession;
 import org.cytoscape.session.CySessionManager;
 import org.cytoscape.session.events.*;
 
@@ -52,7 +49,6 @@ public class FunctionsPanel extends JPanel implements CytoPanelComponent, Sessio
 	
 	private FunctionsManager funManager;
 	private CySessionManager sessionManager;
-	private LoadManager loadManager;
 	
 	public FunctionsPanel(CyApplicationManager cyAppManager, FunctionsManager info, CySessionManager sessionManager){
 		this.cyAppManager = cyAppManager;
