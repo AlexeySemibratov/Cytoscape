@@ -1,4 +1,4 @@
-package org.cytoscape.sample.internal.motives;
+package org.cytoscape.internal.panels;
 
 import java.awt.event.ActionEvent;
 
@@ -8,23 +8,22 @@ import org.cytoscape.application.swing.CytoPanel;
 import org.cytoscape.application.swing.CytoPanelName;
 import org.cytoscape.application.swing.CytoPanelState;
 
-
-public class MotivesPanelAction extends AbstractCyAction {
+public class FunctionsPanelAction extends AbstractCyAction{
 	
-	private static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = 91456847100L;
 	private CySwingApplication csApp;
 	private final CytoPanel cytoPanelWest;
-	private MotivesPanel mcPanel;
+	private FunctionsPanel panel;
 	
-	public MotivesPanelAction (CySwingApplication csApp,
-			MotivesPanel mcPanel){
-		super("Motives Panel");
+	public FunctionsPanelAction (CySwingApplication csApp,
+			FunctionsPanel mcPanel){
+		super("Function Panel");
 		setPreferredMenu("Apps");
 
 		this.csApp = csApp;
 		
 		this.cytoPanelWest = this.csApp.getCytoPanel(CytoPanelName.WEST);
-		this.mcPanel = mcPanel;
+		this.panel = mcPanel;
 	}
 	
 	public void actionPerformed(ActionEvent e) {
@@ -32,10 +31,11 @@ public class MotivesPanelAction extends AbstractCyAction {
 			cytoPanelWest.setState(CytoPanelState.DOCK);
 		}	
 
-		int index = cytoPanelWest.indexOfComponent(mcPanel);
+		int index = cytoPanelWest.indexOfComponent(panel);
 		if (index == -1) {
 			return;
 		}
 		cytoPanelWest.setSelectedIndex(index);
 	}
+
 }

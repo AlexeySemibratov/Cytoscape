@@ -4,14 +4,16 @@
 
 	<properties>
 		<bundle.symbolicName>org.cytoscape.boolean_network</bundle.symbolicName>
-		<bundle.namespace>org.cytoscape.sample.internal</bundle.namespace>
-		<cytoscape.api.version>3.0.0</cytoscape.api.version>
-
-		<maven-bundle-plugin.version>2.3.4</maven-bundle-plugin.version>
-		<osgi.api.version>4.2.0</osgi.api.version>
+		<bundle.namespace>org.cytoscape.internal</bundle.namespace>
+		<cytoscape.api.version>3.8.0</cytoscape.api.version>
+		<maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
+		<maven-surefire-plugin.version>3.0.0-M3</maven-surefire-plugin.version>
+		<maven-bundle-plugin.version>4.1.0</maven-bundle-plugin.version>
+		<osgi.api.version>6.0.0</osgi.api.version>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 	</properties>
 
-	<groupId>org.cytoscape.sample</groupId>
+	<groupId>org.cytoscape.internal</groupId>
 	<artifactId>boolean_network</artifactId>
 	<packaging>bundle</packaging>
 	<version>1.0</version>
@@ -49,10 +51,10 @@
 				<inherited>true</inherited>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
-				<version>3.0</version>
+				<version>3.8.1</version>
 				<configuration>
-					<source>1.6</source>
-					<target>1.6</target>
+					<source>11</source>
+					<target>11</target>
 					<optimize>true</optimize>
 					<showWarnings>true</showWarnings>
 					<showDeprecation>true</showDeprecation>
@@ -74,6 +76,8 @@
 						<Export-Package>!${bundle.namespace}.*</Export-Package>
 						<Private-Package>${bundle.namespace}.*</Private-Package>
 						<Bundle-Activator>${bundle.namespace}.CyActivator</Bundle-Activator>
+						<!--<Embed-Dependency>tweety-full</Embed-Dependency>
+						<Embed-Transitive>true</Embed-Transitive>-->
 					</instructions>
 				</configuration>
 			</plugin>
@@ -116,7 +120,6 @@
 			<artifactId>swing-app-api</artifactId>
 			<version>${cytoscape.api.version}</version>
 		</dependency>
-
 	</dependencies>
 
 </project>

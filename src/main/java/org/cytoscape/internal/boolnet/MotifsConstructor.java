@@ -1,12 +1,12 @@
-package org.cytoscape.sample.internal.motives;
+package org.cytoscape.internal.boolnet;
 
 
 import org.cytoscape.model.CyNetwork;
 import org.cytoscape.model.CyNode;
 
-public class MotivesConstructor {
+public class MotifsConstructor {
 	
-	public static void CreatePath(CyNetwork network, int length)
+	public static void CreateChain(CyNetwork network, int length)
 	{	
 		CyNode[] nodes = new CyNode[length];
 		
