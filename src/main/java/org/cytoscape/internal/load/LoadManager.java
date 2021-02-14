@@ -7,6 +7,8 @@ import java.util.List;
 
 public class LoadManager {
 
+    //TestComment
+
     private List<File> netFiles;
 
     public LoadManager(){
