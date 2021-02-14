@@ -42,7 +42,7 @@ public class FunctionsPanel extends JPanel implements CytoPanelComponent, Sessio
 
 	private CyApplicationManager cyAppManager;
 
-	private JButton btnAddFunction, btnClear, btnDelSelected, btnUpdate, btnTest;
+	private JButton btnAddFunction, btnClear, btnDelSelected, btnUpdate;
 	private JPanel thisPanel, btnPanel,tablesPanel;
 	private DefaultComboBoxModel<String> cbModel;
 	private JComboBox<String> nodesBox;

@@ -76,8 +76,6 @@
 						<Export-Package>!${bundle.namespace}.*</Export-Package>
 						<Private-Package>${bundle.namespace}.*</Private-Package>
 						<Bundle-Activator>${bundle.namespace}.CyActivator</Bundle-Activator>
-						<!--<Embed-Dependency>tweety-full</Embed-Dependency>
-						<Embed-Transitive>true</Embed-Transitive>-->
 					</instructions>
 				</configuration>
 			</plugin>

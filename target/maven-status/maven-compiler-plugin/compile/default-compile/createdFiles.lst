@@ -1,6 +1,7 @@
 org\cytoscape\internal\boolnet\functions\alhoritms\FixedPoints.class
 org\cytoscape\internal\utils\TableUtils$2.class
 org\cytoscape\internal\boolnet\functions\State.class
+org\cytoscape\internal\panels\KeyListeners.class
 org\cytoscape\internal\panels\FunctionsPanel$1.class
 org\cytoscape\internal\boolnet\functions\alhoritms\AttractorSearch.class
 org\cytoscape\internal\utils\MathUtils.class
@@ -13,7 +14,6 @@ org\cytoscape\internal\panels\FunctionsPanel.class
 org\cytoscape\internal\utils\TableUtils$NTTableModel.class
 org\cytoscape\internal\boolnet\functions\alhoritms\SynchNetwork.class
 org\cytoscape\internal\boolnet\MotifsConstructor.class
-org\cytoscape\internal\load\LoadManager.class
 org\cytoscape\internal\boolnet\functions\FunctionsManager.class
 org\cytoscape\internal\utils\TableUtils$1.class
 org\cytoscape\internal\panels\BNetPanelAction.class
