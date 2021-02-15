@@ -1,10 +1,6 @@
 package org.cytoscape.internal.panels;
 
-import java.awt.Component;
-import java.awt.Dimension;
-import java.awt.FlowLayout;
-import java.awt.Font;
-import java.awt.GridLayout;
+import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.BufferedReader;
@@ -23,6 +19,8 @@ import javax.swing.table.DefaultTableModel;
 import org.cytoscape.application.CyApplicationManager;
 import org.cytoscape.application.swing.CytoPanelComponent;
 import org.cytoscape.application.swing.CytoPanelName;
+import org.cytoscape.internal.parser.BUtil;
+import org.cytoscape.internal.parser.ParserException;
 import org.cytoscape.internal.utils.FileUtils;
 import org.cytoscape.model.CyEdge;
 import org.cytoscape.model.CyNetwork;
@@ -39,10 +37,11 @@ public class FunctionsPanel extends JPanel implements CytoPanelComponent, Sessio
 	private static final long serialVersionUID = 55145613390057L;
 
 	private static final String FUNCTIONS_TABLE = "__tablesPanel";
+	private static final Font BOLD_FONT = new Font("TimesRoman", Font.BOLD, 12);
 
 	private CyApplicationManager cyAppManager;
 
-	private JButton btnAddFunction, btnClear, btnDelSelected, btnUpdate;
+	private JButton btnAddFunction, btnAddFunctionUseParser, btnClear, btnDelSelected, btnUpdate;
 	private JPanel thisPanel, btnPanel,tablesPanel;
 	private DefaultComboBoxModel<String> cbModel;
 	private JComboBox<String> nodesBox;
@@ -76,9 +75,10 @@ public class FunctionsPanel extends JPanel implements CytoPanelComponent, Sessio
 	}
 	
 	private void initButtons() {
-		btnAddFunction = new JButton("Add function to selected node");
+		btnAddFunction = new JButton("Add function [as Truth Table] to selected node");
+		btnAddFunctionUseParser = new JButton("Add function [as String] to selected node");
 		btnClear = new JButton("Clear All!");
-		btnClear.setFont(new Font("TimesRoman", Font.BOLD, 12));
+		btnClear.setFont(BOLD_FONT);
 		btnUpdate = new JButton("Update");
 		btnDelSelected = new JButton("Delete selected function");
 
@@ -86,11 +86,12 @@ public class FunctionsPanel extends JPanel implements CytoPanelComponent, Sessio
 		btnUpdate.setToolTipText("Applies all entered data in tables");
 		btnClear.setToolTipText("Remove all tables");
 
-		GridLayout layout = new GridLayout(2, 2, 5, 8);
+		GridLayout layout = new GridLayout(3, 2, 5, 8);
 		btnPanel = new JPanel();
 		btnPanel.setLayout(layout);
-		btnPanel.setPreferredSize(new Dimension(350,75));
+		btnPanel.setPreferredSize(new Dimension(350,115));
 		btnPanel.add(btnAddFunction);
+		btnPanel.add(btnAddFunctionUseParser);
 		btnPanel.add(btnUpdate);
 		btnPanel.add(btnDelSelected);
 		btnPanel.add(btnClear);
@@ -106,7 +107,17 @@ public class FunctionsPanel extends JPanel implements CytoPanelComponent, Sessio
 				PopupMessage.ErrorMessage("You must select only 1 node!");
 				return;
 			}
-			addTable(nodes.get(0), cyAppManager.getCurrentNetwork());
+			addTable(nodes.get(0), cyAppManager.getCurrentNetwork(), false);
+		});
+		btnAddFunctionUseParser.addActionListener(e -> {
+			CyNetwork network = cyAppManager.getCurrentNetwork();
+			List<CyNode> nodes = CyTableUtil.getNodesInState(network,"selected",true);
+
+			if(nodes.size()!=1) {
+				PopupMessage.ErrorMessage("You must select only 1 node!");
+				return;
+			}
+			addTable(nodes.get(0), cyAppManager.getCurrentNetwork(), true);
 		});
 		btnDelSelected.addActionListener(e -> {
 				String selected = (String) nodesBox.getSelectedItem();
@@ -173,7 +184,7 @@ public class FunctionsPanel extends JPanel implements CytoPanelComponent, Sessio
 		});
 	}
 	
-	private boolean addTable(CyNode node, CyNetwork network) {
+	private boolean addTable(CyNode node, CyNetwork network, boolean useParser) {
 		String mainNode = network.getDefaultNodeTable().getRow(node.getSUID()).get("name", String.class);
 		if(!funManager.nodeTableIsEmpty()) {
 			if(funManager.containsNode(mainNode)) {
@@ -196,13 +207,65 @@ public class FunctionsPanel extends JPanel implements CytoPanelComponent, Sessio
         columnsHeader[n] = network.getDefaultNodeTable().getRow(node.getSUID()).get("name", String.class);
         
         Integer[] values = new Integer[(int) Math.pow(2.0, n)];
-        for(int i=0; i<values.length;i++) values[i]=0;
-
 		String[] arguments = Arrays.copyOfRange((String[])columnsHeader,0,columnsHeader.length-1);
-		funManager.addNodeTable(arguments,(String) columnsHeader[columnsHeader.length-1]);
 
-        initTable((String[]) columnsHeader, values);
-        return true;
+		if(!useParser) {
+			for (int i = 0; i < values.length; i++)
+				values[i] = 0;
+
+			funManager.addNodeTable(arguments, (String) columnsHeader[columnsHeader.length - 1]);
+
+			initTable((String[]) columnsHeader, values);
+			return true;
+		}
+		else {
+
+			boolean exitFlag = false;
+
+			JPanel panel = new JPanel();
+			JLabel label;
+			panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+
+			panel.add(new JLabel("Type function for node [" + columnsHeader[n] + "]"));
+			panel.add(new JLabel("Use this arguments list: " + Arrays.toString(arguments)));
+
+
+			panel.add(new JLabel("Available operators:"));
+			panel.add(new JLabel("\"AND\", \"&&\", \"&\" - logical AND"));
+			panel.add(new JLabel("\"OR\", \"||\", \"|\" - logical OR"));
+			panel.add(new JLabel("\"NOT\", \"!\" - logical NEGATION"));
+			panel.add(new JLabel("\"(\", \")\" - BRACKETS"));
+			panel.add(new JLabel("Tip: Use brackets, this is how the parser determines the priority of operations."));
+
+			label = new JLabel("Variable name should not contain a space!");
+			label.setForeground(Color.RED);
+			panel.add(label);
+
+			String example = "(x1 OR x2) AND NOT(x3)";
+			label = new JLabel("example: " + example);
+			panel.add(label);
+
+			for(Component c:panel.getComponents()){
+				if (c instanceof JLabel) {
+					((JLabel) c).setFont(new Font("TimesRoman", Font.LAYOUT_LEFT_TO_RIGHT, 14));
+				}
+			}
+
+			while(!exitFlag) {
+				String function = JOptionPane.showInputDialog(null, panel, "Function", JOptionPane.INFORMATION_MESSAGE);
+				try {
+					values = BUtil.parseFunction(function, arguments);
+					exitFlag = true;
+				} catch (ParserException e) {
+					PopupMessage.ErrorMessage(e);
+					exitFlag = false;
+				}
+
+			}
+			funManager.addNodeTable(arguments, (String) columnsHeader[n], values);
+			initTable((String[]) columnsHeader, values);
+			return true;
+		}
 	}
 	
 	private boolean initTable(String[] columnsHeader, Integer[] values) {
