@@ -9,6 +9,8 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -19,9 +21,9 @@ import javax.swing.table.DefaultTableModel;
 import org.cytoscape.application.CyApplicationManager;
 import org.cytoscape.application.swing.CytoPanelComponent;
 import org.cytoscape.application.swing.CytoPanelName;
-import org.cytoscape.internal.parser.BUtil;
-import org.cytoscape.internal.parser.ParserException;
+import org.cytoscape.internal.parser.MXParser;
 import org.cytoscape.internal.utils.FileUtils;
+import org.cytoscape.internal.utils.SwingUtils;
 import org.cytoscape.model.CyEdge;
 import org.cytoscape.model.CyNetwork;
 import org.cytoscape.model.CyNode;
@@ -34,420 +36,447 @@ import org.cytoscape.session.events.*;
 
 
 public class FunctionsPanel extends JPanel implements CytoPanelComponent, SessionAboutToBeSavedListener, SessionLoadedListener {
-	private static final long serialVersionUID = 55145613390057L;
+    private static final long serialVersionUID = 55145613390057L;
 
-	private static final String FUNCTIONS_TABLE = "__tablesPanel";
-	private static final Font BOLD_FONT = new Font("TimesRoman", Font.BOLD, 12);
+    private static final String FUNCTIONS_TABLE = "__tablesPanel";
+    private static final Font BOLD_FONT = new Font("TimesRoman", Font.BOLD, 12);
+    private static final String MX_PARSER_OPERATORS_LINK = "http://mathparser.org/mxparser-math-collection/boolean-operators/";
 
-	private CyApplicationManager cyAppManager;
+    private CyApplicationManager cyAppManager;
 
-	private JButton btnAddFunction, btnAddFunctionUseParser, btnClear, btnDelSelected, btnUpdate;
-	private JPanel thisPanel, btnPanel,tablesPanel;
-	private DefaultComboBoxModel<String> cbModel;
-	private JComboBox<String> nodesBox;
-	
-	private FunctionsManager funManager;
-	private CySessionManager sessionManager;
-	
-	public FunctionsPanel(CyApplicationManager cyAppManager, FunctionsManager info, CySessionManager sessionManager){
-		this.cyAppManager = cyAppManager;
-		cbModel = new DefaultComboBoxModel<>();
-		
-		this.funManager = info;
-		this.sessionManager = sessionManager;
-		
-		nodesBox = new JComboBox<String>(cbModel);
-		nodesBox.setPreferredSize(new Dimension(100,25));
-		this.setLayout(new FlowLayout(FlowLayout.CENTER));
-		initButtons();
+    private JButton btnAddFunction, btnAddFunctionUseParser, btnAddFunctionWithoutIterGraph, btnClear, btnDelSelected, btnUpdate;
+    private JPanel thisPanel, btnPanel, tablesPanel;
+    private DefaultComboBoxModel<String> cbModel;
+    private JComboBox<String> nodesBox;
 
-		tablesPanel = new JPanel();
-		tablesPanel.setPreferredSize(new Dimension(350, 450));
-		tablesPanel.setName(FUNCTIONS_TABLE);
+    private FunctionsManager funManager;
+    private CySessionManager sessionManager;
 
-		this.add(btnPanel);
-		this.add(nodesBox);
-		this.add(tablesPanel);
-		thisPanel = this;
-		nodesBox.addActionListener(new boxSelectionListener());
-		addInputListeners();
-		this.setVisible(true);
-	}
-	
-	private void initButtons() {
-		btnAddFunction = new JButton("Add function [as Truth Table] to selected node");
-		btnAddFunctionUseParser = new JButton("Add function [as String] to selected node");
-		btnClear = new JButton("Clear All!");
-		btnClear.setFont(BOLD_FONT);
-		btnUpdate = new JButton("Update");
-		btnDelSelected = new JButton("Delete selected function");
+    public FunctionsPanel(CyApplicationManager cyAppManager, FunctionsManager info, CySessionManager sessionManager) {
+        this.cyAppManager = cyAppManager;
+        cbModel = new DefaultComboBoxModel<>();
 
-		btnAddFunction.setToolTipText("Create a new truth table for the selected node");
-		btnUpdate.setToolTipText("Applies all entered data in tables");
-		btnClear.setToolTipText("Remove all tables");
+        this.funManager = info;
+        this.sessionManager = sessionManager;
 
-		GridLayout layout = new GridLayout(3, 2, 5, 8);
-		btnPanel = new JPanel();
-		btnPanel.setLayout(layout);
-		btnPanel.setPreferredSize(new Dimension(350,115));
-		btnPanel.add(btnAddFunction);
-		btnPanel.add(btnAddFunctionUseParser);
-		btnPanel.add(btnUpdate);
-		btnPanel.add(btnDelSelected);
-		btnPanel.add(btnClear);
-		
-	}
+        nodesBox = new JComboBox(cbModel);
+        nodesBox.setPreferredSize(new Dimension(100, 25));
+        this.setLayout(new FlowLayout(FlowLayout.CENTER));
+        initButtons();
 
-	private void addInputListeners() {
-		btnAddFunction.addActionListener(e -> {
-			CyNetwork network = cyAppManager.getCurrentNetwork();
-			List<CyNode> nodes = CyTableUtil.getNodesInState(network,"selected",true);
+        tablesPanel = new JPanel();
+        tablesPanel.setPreferredSize(new Dimension(350, 450));
+        tablesPanel.setName(FUNCTIONS_TABLE);
 
-			if(nodes.size()!=1) {
-				PopupMessage.ErrorMessage("You must select only 1 node!");
-				return;
-			}
-			addTable(nodes.get(0), cyAppManager.getCurrentNetwork(), false);
-		});
-		btnAddFunctionUseParser.addActionListener(e -> {
-			CyNetwork network = cyAppManager.getCurrentNetwork();
-			List<CyNode> nodes = CyTableUtil.getNodesInState(network,"selected",true);
+        this.add(btnPanel);
+        this.add(nodesBox);
+        this.add(tablesPanel);
+        thisPanel = this;
+        nodesBox.addActionListener(new boxSelectionListener());
+        addInputListeners();
+        this.setVisible(true);
+    }
 
-			if(nodes.size()!=1) {
-				PopupMessage.ErrorMessage("You must select only 1 node!");
-				return;
-			}
-			addTable(nodes.get(0), cyAppManager.getCurrentNetwork(), true);
-		});
-		btnDelSelected.addActionListener(e -> {
-				String selected = (String) nodesBox.getSelectedItem();
-				if(selected == "") return;
-				int select = PopupMessage.ConfirmMessage("Are you want to remove function for ["+selected+"]");
-				if(select!=0) return;
-				funManager.removeNodeTable(selected);
-				nodesBox.removeItemAt(nodesBox.getSelectedIndex());
-				Component[] components = thisPanel.getComponents();
-				for(Component c:components)
-					{
-						if(c.getName() == selected) {
-							thisPanel.remove(c);
-							return;
-						}
-					}
-		});
-		btnClear.addActionListener(e -> {
-				int select = PopupMessage.ConfirmMessage("Are you want to remove all functions?");
-				if(select!=0) return;
-				nodesBox.removeAllItems();
-				funManager.removeAllNodeTables();
-				Component[] components = thisPanel.getComponents();
-				for(Component c:components)
-					{
-						if(c.getClass() == JScrollPane.class) thisPanel.remove(c);
-					}
-		});
-		btnUpdate.addActionListener(arg0 -> {
+    private void initButtons() {
+        btnAddFunction = new JButton("Add empty truth table to selected node");
+        btnAddFunctionUseParser = new JButton("[Iteraction graph] Add function to selected node");
+        btnAddFunctionWithoutIterGraph = new JButton("Add function");
+        btnClear = new JButton("Clear All!");
+        btnClear.setFont(BOLD_FONT);
+        btnUpdate = new JButton("Update");
+        btnDelSelected = new JButton("Delete selected function");
 
-			Component[] components = thisPanel.getComponents();
-			for(Component c:components)
-			{
-				if(funManager.containsNode(c.getName()))
-				{
-					JScrollPane pane = (JScrollPane) c;
-					JTable table = (JTable) pane.getViewport().getComponent(0);
+        btnAddFunction.setToolTipText("Create a new truth table for the selected node");
+        btnUpdate.setToolTipText("Applies all entered data in tables");
+        btnClear.setToolTipText("Remove all tables");
 
-					int n = table.getRowCount();
-					int m = table.getColumnCount();
+        GridLayout layout = new GridLayout(3, 2, 5, 8);
+        btnPanel = new JPanel();
+        btnPanel.setLayout(layout);
+        btnPanel.setPreferredSize(new Dimension(350, 115));
+        btnPanel.add(btnAddFunctionWithoutIterGraph);
+        btnPanel.add(btnAddFunction);
+        btnPanel.add(btnAddFunctionUseParser);
+        btnPanel.add(btnUpdate);
+        btnPanel.add(btnDelSelected);
+        btnPanel.add(btnClear);
 
-					int[] values = new int[n];
-					String[] arguments = new String[m-1];
+    }
 
-					for(int i=0; i<m-1; i++) {
-						arguments[i] = table.getColumnName(i);
-					}
+    private void addInputListeners() {
+        btnAddFunctionWithoutIterGraph.addActionListener(e -> {
+            JFrame frame = new JFrame();
+            frame.setPreferredSize(new Dimension(100, 100));
+            JPanel panel = new JPanel();
+            panel.setSize(new Dimension(200, 400));
 
-					for(int i=0; i<n; i++) {
-						if(table.getValueAt(i, m-1).getClass() == String.class) values[i] = Integer.parseInt((String) table.getValueAt(i, m-1));
-						else values[i] = (Integer) table.getValueAt(i, m-1);
-						if(!(values[i]==0 || values[i]==1)) {
-							PopupMessage.ErrorMessage(
-									new IllegalArgumentException("Illegal argument <"+ values[i] +"> for node <" + c.getName() + "> in " + (i+1) +"-th line. " +
-											"Values can only be '0' (false) and '1' (true)."));
-							return;
-						}
-					}
+            URI uri = null;
+            try {
+                uri = new URI(MX_PARSER_OPERATORS_LINK);
+            } catch (URISyntaxException exc) {
+                PopupMessage.ErrorMessage(exc);
+            }
+            JLabel linkLabel = new JLabel();
+            linkLabel.addMouseListener(SwingUtils.uriListener(uri));
+            linkLabel.setText("<HTML><U>Click for browse available operators </U></HTML>");
 
-					funManager.getNodeTablebyNode(table.getColumnName(m-1)).setValues(values);
+            JTextField argField = new JTextField("example for x = f(x,y,z): x y z x", 30);
+            JTextField expressionField = new JTextField("example: (x || y) (+) z", 30);
+            JButton btnConfirm = new JButton("Confirm");
 
-				}
-			}
-		});
-	}
-	
-	private boolean addTable(CyNode node, CyNetwork network, boolean useParser) {
-		String mainNode = network.getDefaultNodeTable().getRow(node.getSUID()).get("name", String.class);
-		if(!funManager.nodeTableIsEmpty()) {
-			if(funManager.containsNode(mainNode)) {
-				JOptionPane.showMessageDialog(null, "You already set function for this Node");
-				return false;
-			}
-		}
+            GridLayout layout = new GridLayout(4, 1, 4, 2);
+            panel.setLayout(layout);
+            panel.add(linkLabel);
+            panel.add(argField);
+            panel.add(expressionField);
+            panel.add(btnConfirm);
+            frame.add(panel);
+            frame.setVisible(true);
 
-		List<CyEdge> incomingEdges = network.getAdjacentEdgeList(node, CyEdge.Type.INCOMING);
-		if(incomingEdges.isEmpty()) return false;
-		int n = incomingEdges.size();
+            btnConfirm.addActionListener(ev -> {
+                String[] fullArguments = argField.getText().split(" ");
+                String[] args = Arrays.copyOf(fullArguments, fullArguments.length - 1);
+                Integer[] values = MXParser.parse(expressionField.getText(), args);
 
-        Object[] columnsHeader = new String[n+1];
+                String mainNode = fullArguments[fullArguments.length - 1];
+                if (!funManager.nodeTableIsEmpty()) {
+                    if (funManager.containsNode(mainNode)) {
+                        JOptionPane.showMessageDialog(null, "You already set function for " + mainNode);
+                        return;
+                    }
+                }
+                funManager.addNodeTable(args, mainNode, values);
+                initTable(fullArguments, values);
+            });
+        });
+        btnAddFunction.addActionListener(e -> {
+            CyNetwork network = cyAppManager.getCurrentNetwork();
+            List<CyNode> nodes = CyTableUtil.getNodesInState(network, "selected", true);
+
+            if (nodes.size() != 1) {
+                PopupMessage.ErrorMessage("You must select only 1 node!");
+                return;
+            }
+            addTable(nodes.get(0), cyAppManager.getCurrentNetwork(), false);
+        });
+        btnAddFunctionUseParser.addActionListener(e -> {
+            CyNetwork network = cyAppManager.getCurrentNetwork();
+            List<CyNode> nodes = CyTableUtil.getNodesInState(network, "selected", true);
+
+            if (nodes.size() != 1) {
+                PopupMessage.ErrorMessage("You must select only 1 node!");
+                return;
+            }
+            addTable(nodes.get(0), cyAppManager.getCurrentNetwork(), true);
+        });
+        btnDelSelected.addActionListener(e -> {
+            String selected = (String) nodesBox.getSelectedItem();
+            if (selected == "") return;
+            int select = PopupMessage.ConfirmMessage("Are you want to remove function for [" + selected + "]");
+            if (select != 0) return;
+            funManager.removeNodeTable(selected);
+            nodesBox.removeItemAt(nodesBox.getSelectedIndex());
+            for (Component c : tablesPanel.getComponents()) {
+                if (c.getName().equals(selected)) {
+                    tablesPanel.remove(c);
+                    return;
+                }
+            }
+        });
+        btnClear.addActionListener(e -> {
+            int select = PopupMessage.ConfirmMessage("Are you want to remove all functions?");
+            if (select != 0) return;
+            nodesBox.removeAllItems();
+            funManager.removeAllNodeTables();
+            tablesPanel.removeAll();
+        });
+        btnUpdate.addActionListener(arg0 -> {
+            for (Component c : tablesPanel.getComponents()) {
+                if (funManager.containsNode(c.getName())) {
+                    JScrollPane pane = (JScrollPane) c;
+                    JTable table = (JTable) pane.getViewport().getComponent(0);
+
+                    int n = table.getRowCount();
+                    int m = table.getColumnCount();
+
+                    int[] values = new int[n];
+                    String[] arguments = new String[m - 1];
+
+                    for (int i = 0; i < m - 1; i++) {
+                        arguments[i] = table.getColumnName(i);
+                    }
+
+                    for (int i = 0; i < n; i++) {
+                        if (table.getValueAt(i, m - 1).getClass() == String.class)
+                            values[i] = Integer.parseInt((String) table.getValueAt(i, m - 1));
+                        else values[i] = (Integer) table.getValueAt(i, m - 1);
+                        if (!(values[i] == 0 || values[i] == 1)) {
+                            PopupMessage.ErrorMessage(
+                                    new IllegalArgumentException("Illegal argument <" + values[i] +
+                                            "> for node <" + c.getName() + "> in " + (i + 1) + "-th line. " +
+                                            "Values can only be '0' (false) and '1' (true)."));
+                            return;
+                        }
+                    }
+
+                    funManager.getNodeTablebyNode(table.getColumnName(m - 1)).setValues(values);
+
+                }
+            }
+        });
+    }
+
+    private boolean addTable(CyNode node, CyNetwork network, boolean useParser) {
+        String mainNode = network.getDefaultNodeTable().getRow(node.getSUID()).get("name", String.class);
+        if (!funManager.nodeTableIsEmpty()) {
+            if (funManager.containsNode(mainNode)) {
+                JOptionPane.showMessageDialog(null, "You already set function for this Node");
+                return false;
+            }
+        }
+
+        List<CyEdge> incomingEdges = network.getAdjacentEdgeList(node, CyEdge.Type.INCOMING);
+        if (incomingEdges.isEmpty()) return false;
+        int n = incomingEdges.size();
+
+        Object[] columnsHeader = new String[n + 1];
         String nodeName;
-        for(int i=0; i < columnsHeader.length - 1; i++)
-        {
-        	nodeName = network.getDefaultNodeTable().getRow(incomingEdges.get(i).getSource().getSUID()).get("name", String.class);
-        	columnsHeader[i] = nodeName;
+        for (int i = 0; i < columnsHeader.length - 1; i++) {
+            nodeName = network.getDefaultNodeTable().getRow(incomingEdges.get(i).getSource().getSUID()).get("name", String.class);
+            columnsHeader[i] = nodeName;
         }
         columnsHeader[n] = network.getDefaultNodeTable().getRow(node.getSUID()).get("name", String.class);
-        
+
         Integer[] values = new Integer[(int) Math.pow(2.0, n)];
-		String[] arguments = Arrays.copyOfRange((String[])columnsHeader,0,columnsHeader.length-1);
+        String[] arguments = Arrays.copyOfRange((String[]) columnsHeader, 0, columnsHeader.length - 1);
 
-		if(!useParser) {
-			for (int i = 0; i < values.length; i++)
-				values[i] = 0;
+        if (!useParser) {
+            for (int i = 0; i < values.length; i++)
+                values[i] = 0;
 
-			funManager.addNodeTable(arguments, (String) columnsHeader[columnsHeader.length - 1]);
+            funManager.addNodeTable(arguments, (String) columnsHeader[columnsHeader.length - 1]);
 
-			initTable((String[]) columnsHeader, values);
-			return true;
-		}
-		else {
+            initTable((String[]) columnsHeader, values);
+            return true;
+        } else {
+            boolean exitFlag = false;
 
-			boolean exitFlag = false;
+            JPanel panel = new JPanel();
+            JLabel label;
+            panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
 
-			JPanel panel = new JPanel();
-			JLabel label;
-			panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+            panel.add(new JLabel("Type function for node [" + columnsHeader[n] + "]"));
+            panel.add(new JLabel("Use this arguments list: " + Arrays.toString(arguments)));
 
-			panel.add(new JLabel("Type function for node [" + columnsHeader[n] + "]"));
-			panel.add(new JLabel("Use this arguments list: " + Arrays.toString(arguments)));
+            URI uri = null;
+            try {
+                uri = new URI(MX_PARSER_OPERATORS_LINK);
+            } catch (URISyntaxException e) {
+                PopupMessage.ErrorMessage(e);
+            }
+            JLabel linkLabel = new JLabel();
+            linkLabel.addMouseListener(SwingUtils.uriListener(uri));
+            linkLabel.setText("<HTML><U>Click for browse available operators </U></HTML>");
+            panel.add(linkLabel);
 
+            label = new JLabel("Variable name should not contain a space!");
+            label.setForeground(Color.RED);
+            panel.add(label);
 
-			panel.add(new JLabel("Available operators:"));
-			panel.add(new JLabel("\"AND\", \"&&\", \"&\" - logical AND"));
-			panel.add(new JLabel("\"OR\", \"||\", \"|\" - logical OR"));
-			panel.add(new JLabel("\"NOT\", \"!\" - logical NEGATION"));
-			panel.add(new JLabel("\"(\", \")\" - BRACKETS"));
-			panel.add(new JLabel("Tip: Use brackets, this is how the parser determines the priority of operations."));
+            for (Component c : panel.getComponents()) {
+                if (c instanceof JLabel) {
+                    c.setFont(new Font("TimesRoman", Font.LAYOUT_LEFT_TO_RIGHT, 14));
+                }
+            }
 
-			label = new JLabel("Variable name should not contain a space!");
-			label.setForeground(Color.RED);
-			panel.add(label);
+            while (!exitFlag) {
+                String function = JOptionPane.showInputDialog(null, panel, "Function", JOptionPane.INFORMATION_MESSAGE);
+                values = MXParser.parse(function, arguments);
+                exitFlag = true;
+            }
+            funManager.addNodeTable(arguments, (String) columnsHeader[n], values);
+            initTable((String[]) columnsHeader, values);
+            return true;
+        }
+    }
 
-			String example = "(x1 OR x2) AND NOT(x3)";
-			label = new JLabel("example: " + example);
-			panel.add(label);
+    private boolean initTable(String[] columnsHeader, Integer[] values) {
+        DefaultTableModel tableModel = new DefaultTableModel() {
+            private static final long serialVersionUID = 199459756891294L;
 
-			for(Component c:panel.getComponents()){
-				if (c instanceof JLabel) {
-					((JLabel) c).setFont(new Font("TimesRoman", Font.LAYOUT_LEFT_TO_RIGHT, 14));
-				}
-			}
+            @Override
+            public boolean isCellEditable(int i, int j) {
+                return (j == this.getColumnCount() - 1) ? true : false;
+            }
+        };
 
-			while(!exitFlag) {
-				String function = JOptionPane.showInputDialog(null, panel, "Function", JOptionPane.INFORMATION_MESSAGE);
-				try {
-					values = BUtil.parseFunction(function, arguments);
-					exitFlag = true;
-				} catch (ParserException e) {
-					PopupMessage.ErrorMessage(e);
-					exitFlag = false;
-				}
-
-			}
-			funManager.addNodeTable(arguments, (String) columnsHeader[n], values);
-			initTable((String[]) columnsHeader, values);
-			return true;
-		}
-	}
-	
-	private boolean initTable(String[] columnsHeader, Integer[] values) {
-		DefaultTableModel tableModel = new DefaultTableModel(){
-			private static final long serialVersionUID = 199459756891294L;
-
-			@Override
-	        public boolean isCellEditable(int i, int j) {
-	            return (j==this.getColumnCount()-1) ? true:false;
-	        }
-	    };
-	    
         tableModel.setColumnIdentifiers(columnsHeader);
         for (int i = 0; i < values.length; i++)
             tableModel.addRow(new Integer[columnsHeader.length]);
         setDefaultValues(tableModel);
-        
+
         for (int i = 0; i < values.length; i++) {
-        	tableModel.setValueAt(values[i], i, columnsHeader.length-1);
+            tableModel.setValueAt(values[i], i, columnsHeader.length - 1);
         }
 
 
         JTable tab = new JTable(tableModel);
         tab.setDefaultRenderer(Object.class, TableUtils.tableRenderer());
         tab.setPreferredScrollableViewportSize(new Dimension(350, 200));
-        
+
         JScrollPane pane = new JScrollPane(tab);
-        pane.setName(columnsHeader[columnsHeader.length-1]);
+        pane.setName(columnsHeader[columnsHeader.length - 1]);
         pane.setPreferredSize(new Dimension(350, 300));
         tablesPanel.add(pane);
-        cbModel.addElement(columnsHeader[columnsHeader.length-1]);
-        cbModel.setSelectedItem(columnsHeader[columnsHeader.length-1]);
+        cbModel.addElement(columnsHeader[columnsHeader.length - 1]);
+        cbModel.setSelectedItem(columnsHeader[columnsHeader.length - 1]);
         pane.setVisible(true);
 
+
         this.repaint();
-		return true;
-	}
-	
-	private void setDefaultValues(DefaultTableModel model) {
-		int rowCount = model.getRowCount();
-		int columnCount = model.getColumnCount();
-		int m = rowCount;
-		int s = 1;
-		for(int j=0; j<(columnCount-1); j++) {
-			m = m/2;
-			for(int i = 0;i<rowCount;i++) 
-			{
-				if(s<=m) model.setValueAt(0, i, j);
-				else model.setValueAt(1, i, j);
-				if(s==2*m) s=0;
-				s++;
-			}
-		}
-	}
-	
-	class boxSelectionListener implements ActionListener {
-		@Override
-		public void actionPerformed(ActionEvent e) {
-			String selected = (String) ((JComboBox<?>) e.getSource()).getSelectedItem();
+        return true;
+    }
 
-			for (Component c : tablesPanel.getComponents()) {
-				if (c.getClass() == JScrollPane.class) {
-					if (c.getName().equals(selected)) {
-						c.setVisible(true);
-					} else c.setVisible(false);
-				}
-			}
-			
-		}
-		
-	}
+    private void setDefaultValues(DefaultTableModel model) {
+        int rowCount = model.getRowCount();
+        int columnCount = model.getColumnCount();
+        int m = rowCount;
+        int s = 1;
+        for (int j = 0; j < (columnCount - 1); j++) {
+            m = m / 2;
+            for (int i = 0; i < rowCount; i++) {
+                if (s <= m) model.setValueAt(0, i, j);
+                else model.setValueAt(1, i, j);
+                if (s == 2 * m) s = 0;
+                s++;
+            }
+        }
+    }
 
-	@Override
-	public Component getComponent() {
-		return this;
-	}
+    class boxSelectionListener implements ActionListener {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            String selected = (String) ((JComboBox<?>) e.getSource()).getSelectedItem();
 
-	@Override
-	public CytoPanelName getCytoPanelName() {
-		return CytoPanelName.WEST;
-	}
+            for (Component c : tablesPanel.getComponents()) {
+                if (c.getClass() == JScrollPane.class) {
+                    if (c.getName().equals(selected)) {
+                        c.setVisible(true);
+                    } else c.setVisible(false);
+                }
+            }
 
-	@Override
-	public String getTitle() {
-		return "Functions panel";
-	}
+        }
 
-	@Override
-	public Icon getIcon() {
-		return null;
-	}
+    }
 
-	@SuppressWarnings("rawtypes")
-	@Override
-	public void handleEvent(SessionAboutToBeSavedEvent e) {
-		String tmpDir = System.getProperty("java.io.tmpdir");
-		String currentSession = FileUtils.getSessionSimpleName(sessionManager.getCurrentSessionFileName());
-		File tableFile = new File(tmpDir,   currentSession  + "__table");
-		
-		try {
-			BufferedWriter writer = new BufferedWriter(new FileWriter(tableFile));
-			for(Component c:tablesPanel.getComponents())
-			{
-				if(funManager.containsNode(c.getName()))
-				{
-					JScrollPane pane = (JScrollPane) c;
-					JTable table = (JTable) pane.getViewport().getComponent(0);
-					writer.write("#" + c.getName() + '\n');
-					saveTable(table, writer);
-					writer.newLine();
-				}
-			}
-			writer.close();
-		} catch (Exception ex) {
-			ex.printStackTrace();
-		}
-		
-		ArrayList<File> files = new ArrayList<File>();
-		files.add(tableFile);
-		try {
-			e.addAppFiles("Network_Functions", files);
-		}
-		catch (Exception ex){
-			ex.printStackTrace();
-		}
-		
-	}
-	
-	private void saveTable(JTable table, BufferedWriter writer) throws IOException {
-		int n = table.getRowCount();
-		int m = table.getColumnCount();
-		for(int i=0; i<m; i++) writer.write(table.getColumnName(i) + "//");
-		writer.newLine();
-		for(int i=0; i<n; i++) {
-			writer.write(table.getValueAt(i, m-1).toString() + " ");
-		}
-	}
-	
-	@Override
-	public void handleEvent(SessionLoadedEvent e) {
-		List<File> files = e.getLoadedSession().getAppFileListMap().get("Network_Functions");
-		if (files == null || files.size() ==0){
-			return;
-		}
+    @Override
+    public Component getComponent() {
+        return this;
+    }
 
-		String currentSession = FileUtils.getSessionSimpleName(sessionManager.getCurrentSessionFileName());
+    @Override
+    public CytoPanelName getCytoPanelName() {
+        return CytoPanelName.WEST;
+    }
 
-		try {
-			File propFile = null;
+    @Override
+    public String getTitle() {
+        return "Functions panel";
+    }
 
-			for(File f:files){
-				if(f.getName().equals(currentSession  + "__table"))	{
-					propFile = f;
-					break;
-				}
-			}
+    @Override
+    public Icon getIcon() {
+        return null;
+    }
 
-			if(propFile == null) return;
+    @SuppressWarnings("rawtypes")
+    @Override
+    public void handleEvent(SessionAboutToBeSavedEvent e) {
+        String tmpDir = System.getProperty("java.io.tmpdir");
+        String currentSession = FileUtils.getSessionSimpleName(sessionManager.getCurrentSessionFileName());
+        File tableFile = new File(tmpDir, currentSession + "__table");
 
-			tablesPanel.removeAll();
-			nodesBox.removeAllItems();
-			
-			BufferedReader in = new BufferedReader(new FileReader(propFile));
-			String s = in.readLine();
-			while(s != null) {
-				if(s.startsWith("#")) {
-					s = in.readLine();
-					String[] headers = s.split("//");
-					String[] svalues = in.readLine().split(" ");
-					Integer[] values = new Integer[svalues.length];
-					for(int i=0; i<values.length;i++) values[i] = Integer.parseInt(svalues[i]);
-					initTable(headers, values);
-					funManager.addNodeTable(Arrays.copyOfRange(headers,0,headers.length-1),
-							headers[headers.length-1],values);
-				}
-				s = in.readLine();
-			}
-			in.close();
+        try {
+            BufferedWriter writer = new BufferedWriter(new FileWriter(tableFile));
+            for (Component c : tablesPanel.getComponents()) {
+                if (funManager.containsNode(c.getName())) {
+                    JScrollPane pane = (JScrollPane) c;
+                    JTable table = (JTable) pane.getViewport().getComponent(0);
+                    writer.write("#" + c.getName() + '\n');
+                    saveTable(table, writer);
+                    writer.newLine();
+                }
+            }
+            writer.close();
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
 
-		} catch (Exception ex) {
-			ex.printStackTrace();
-		}	
-		
-	}
+        ArrayList<File> files = new ArrayList<File>();
+        files.add(tableFile);
+        try {
+            e.addAppFiles("Network_Functions", files);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+
+    }
+
+    private void saveTable(JTable table, BufferedWriter writer) throws IOException {
+        int n = table.getRowCount();
+        int m = table.getColumnCount();
+        for (int i = 0; i < m; i++) writer.write(table.getColumnName(i) + "//");
+        writer.newLine();
+        for (int i = 0; i < n; i++) {
+            writer.write(table.getValueAt(i, m - 1).toString() + " ");
+        }
+    }
+
+    @Override
+    public void handleEvent(SessionLoadedEvent e) {
+        List<File> files = e.getLoadedSession().getAppFileListMap().get("Network_Functions");
+        if (files == null || files.size() == 0) {
+            return;
+        }
+
+        String currentSession = FileUtils.getSessionSimpleName(sessionManager.getCurrentSessionFileName());
+
+        try {
+            File propFile = null;
+
+            for (File f : files) {
+                if (f.getName().equals(currentSession + "__table")) {
+                    propFile = f;
+                    break;
+                }
+            }
+
+            if (propFile == null) return;
+
+            tablesPanel.removeAll();
+            nodesBox.removeAllItems();
+
+            BufferedReader in = new BufferedReader(new FileReader(propFile));
+            String s = in.readLine();
+            while (s != null) {
+                if (s.startsWith("#")) {
+                    s = in.readLine();
+                    String[] headers = s.split("//");
+                    String[] svalues = in.readLine().split(" ");
+                    Integer[] values = new Integer[svalues.length];
+                    for (int i = 0; i < values.length; i++) values[i] = Integer.parseInt(svalues[i]);
+                    initTable(headers, values);
+                    funManager.addNodeTable(Arrays.copyOfRange(headers, 0, headers.length - 1),
+                            headers[headers.length - 1], values);
+                }
+                s = in.readLine();
+            }
+            in.close();
+
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+
+    }
 }
