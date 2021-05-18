@@ -8,7 +8,6 @@ import java.util.HashMap;
 public class MathUtils {
 
     public static int[][] getDefaultNodeTruthTable(int m, int n) {
-
         if (m != (int) Math.pow(2, n)) return null;
 
         int[][] table = new int[m][n];
@@ -30,7 +29,7 @@ public class MathUtils {
 
     public static int[] synchStep(HashMap<String, NodeTable> nodeFunctions, int[] currentValue) {
 
-        String[] arguments = nodeFunctions.keySet().toArray(new String[nodeFunctions.size()]);
+        String[] arguments = nodeFunctions.keySet().toArray(new String[0]);
         int[] nextValue = new int[currentValue.length];
 
         for (int j = 0; j < currentValue.length; j++) {

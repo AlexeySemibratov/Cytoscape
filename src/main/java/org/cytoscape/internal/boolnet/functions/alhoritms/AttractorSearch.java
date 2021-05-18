@@ -11,17 +11,31 @@ import java.util.HashSet;
 
 public class AttractorSearch {
 
+    public static final int FULL_ATTRACTORS_MODE = 1;
+    public static final int FIXED_POINT_MODE = 2;
+
     private HashMap<State, Integer> attractorAssigmentsMap;
+
+    private int mode;
 
     public AttractorSearch() {
         attractorAssigmentsMap = new HashMap<>();
     }
 
-    public ArrayList<ArrayList<State>> search(FunctionsManager manager) {
+    public AttractorSearch(int mode) {
+        this();
+        if (mode == FULL_ATTRACTORS_MODE) {
+            this.mode = FULL_ATTRACTORS_MODE;
+        } else if (mode == FIXED_POINT_MODE) {
+            this.mode = FIXED_POINT_MODE;
+        } else {
+            throw new IllegalArgumentException("Invalid mode code + '" + mode + "'.");
+        }
+    }
 
+    public ArrayList<ArrayList<State>> search(FunctionsManager manager) {
         HashMap<String, NodeTable> nodeFunctions = manager.getAllNodeFunctions();
-        String[] arguments = nodeFunctions.keySet().toArray(new String[nodeFunctions.size()]);
-        int n = arguments.length;
+        int n = nodeFunctions.keySet().size();
         int m = (int) Math.pow(2, n);
 
         HashSet<State> startStates = initStartStates(m, n);
@@ -42,10 +56,18 @@ public class AttractorSearch {
                 if (attractorAssigment(current) == currentAttractor) {
                     State attractorStart = current;
                     ArrayList<State> attractor = new ArrayList<>();
-                    do {
-                        attractor.add(current);
-                        current = MathUtils.synchStep(nodeFunctions, current);
-                    } while (!current.equals(attractorStart));
+                    if (mode == FULL_ATTRACTORS_MODE) {
+                        do {
+                            attractor.add(current);
+                            current = MathUtils.synchStep(nodeFunctions, current);
+                        } while (!current.equals(attractorStart));
+                    } else {
+                        if (current.equals(MathUtils.synchStep(nodeFunctions, current))) {
+                            attractor.add(current);
+                        } else {
+                            continue;
+                        }
+                    }
                     result.add(attractor);
                 } else {
                     State attractorStart = current;
@@ -57,7 +79,6 @@ public class AttractorSearch {
                 }
             }
         }
-
         return result;
     }
 
@@ -71,7 +92,7 @@ public class AttractorSearch {
     }
 
     private int attractorAssigment(State state) {
-        return attractorAssigmentsMap.containsKey(state) ? attractorAssigmentsMap.get(state) : 0;
+        return attractorAssigmentsMap.getOrDefault(state, 0);
     }
 
     private void setAttractorAssigment(State state, int var) {

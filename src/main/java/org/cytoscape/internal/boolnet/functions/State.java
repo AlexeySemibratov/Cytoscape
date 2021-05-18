@@ -2,7 +2,7 @@ package org.cytoscape.internal.boolnet.functions;
 
 public class State {
 
-    int[] state;
+    private final int[] state;
 
     public State(int[] state) {
         this.state = state;
@@ -29,11 +29,10 @@ public class State {
     @Override
     public int hashCode() {
         int hashCode = 7;
-        for (int i = 0; i < state.length; i++) {
-            hashCode = hashCode * 37 + state[i];
+        for (int j : state) {
+            hashCode = hashCode * 37 + j;
         }
         return hashCode;
     }
-
 
 }

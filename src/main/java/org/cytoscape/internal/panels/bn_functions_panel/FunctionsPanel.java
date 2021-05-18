@@ -1,4 +1,4 @@
-package org.cytoscape.internal.panels;
+package org.cytoscape.internal.panels.bn_functions_panel;
 
 import java.awt.*;
 import java.awt.event.ActionEvent;
@@ -14,6 +14,7 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -42,15 +43,17 @@ public class FunctionsPanel extends JPanel implements CytoPanelComponent, Sessio
     private static final Font BOLD_FONT = new Font("TimesRoman", Font.BOLD, 12);
     private static final String MX_PARSER_OPERATORS_LINK = "http://mathparser.org/mxparser-math-collection/boolean-operators/";
 
-    private CyApplicationManager cyAppManager;
+    private final CyApplicationManager cyAppManager;
 
-    private JButton btnAddFunction, btnAddFunctionUseParser, btnAddFunctionWithoutIterGraph, btnClear, btnDelSelected, btnUpdate;
-    private JPanel thisPanel, btnPanel, tablesPanel;
-    private DefaultComboBoxModel<String> cbModel;
-    private JComboBox<String> nodesBox;
+    private JButton btnAddFunction, btnAddFunctionUseParser, btnAddFunctionWithoutIterGraph,
+            btnClear, btnDelSelected, btnUpdate, btnCreateRandom;
+    private JPanel btnPanel;
+    private final JPanel tablesPanel;
+    private final DefaultComboBoxModel<String> cbModel;
+    private final JComboBox nodesBox;
 
-    private FunctionsManager funManager;
-    private CySessionManager sessionManager;
+    private final FunctionsManager funManager;
+    private final CySessionManager sessionManager;
 
     public FunctionsPanel(CyApplicationManager cyAppManager, FunctionsManager info, CySessionManager sessionManager) {
         this.cyAppManager = cyAppManager;
@@ -71,7 +74,6 @@ public class FunctionsPanel extends JPanel implements CytoPanelComponent, Sessio
         this.add(btnPanel);
         this.add(nodesBox);
         this.add(tablesPanel);
-        thisPanel = this;
         nodesBox.addActionListener(new boxSelectionListener());
         addInputListeners();
         this.setVisible(true);
@@ -85,12 +87,13 @@ public class FunctionsPanel extends JPanel implements CytoPanelComponent, Sessio
         btnClear.setFont(BOLD_FONT);
         btnUpdate = new JButton("Update");
         btnDelSelected = new JButton("Delete selected function");
+        btnCreateRandom = new JButton("Random network");
 
         btnAddFunction.setToolTipText("Create a new truth table for the selected node");
         btnUpdate.setToolTipText("Applies all entered data in tables");
         btnClear.setToolTipText("Remove all tables");
 
-        GridLayout layout = new GridLayout(3, 2, 5, 8);
+        GridLayout layout = new GridLayout(4, 2, 5, 8);
         btnPanel = new JPanel();
         btnPanel.setLayout(layout);
         btnPanel.setPreferredSize(new Dimension(350, 115));
@@ -100,6 +103,7 @@ public class FunctionsPanel extends JPanel implements CytoPanelComponent, Sessio
         btnPanel.add(btnUpdate);
         btnPanel.add(btnDelSelected);
         btnPanel.add(btnClear);
+        btnPanel.add(btnCreateRandom);
 
     }
 
@@ -190,6 +194,37 @@ public class FunctionsPanel extends JPanel implements CytoPanelComponent, Sessio
             funManager.removeAllNodeTables();
             tablesPanel.removeAll();
         });
+        btnCreateRandom.addActionListener(e -> {
+            for (Component c : tablesPanel.getComponents()) {
+                if (funManager.containsNode(c.getName())) {
+                    JScrollPane pane = (JScrollPane) c;
+                    JTable table = (JTable) pane.getViewport().getComponent(0);
+
+                    int n = table.getRowCount();
+                    int m = table.getColumnCount();
+
+                    int[] values = new int[n];
+                    Random rand = new Random();
+
+                    for (int i = 0; i < n; i++) {
+                        values[i] = (rand.nextDouble() < 0.35) ? 1 : 0;
+                    }
+                    String[] arguments = new String[m - 1];
+
+                    for (int i = 0; i < m - 1; i++) {
+                        arguments[i] = table.getColumnName(i);
+                    }
+
+                    for (int i = 0; i < n; i++) {
+                        table.setValueAt(values[i], i, m - 1);
+                    }
+
+                    funManager.getNodeTablebyNode(table.getColumnName(m - 1)).setValues(values);
+
+                }
+            }
+        });
+
         btnUpdate.addActionListener(arg0 -> {
             for (Component c : tablesPanel.getComponents()) {
                 if (funManager.containsNode(c.getName())) {
@@ -226,17 +261,17 @@ public class FunctionsPanel extends JPanel implements CytoPanelComponent, Sessio
         });
     }
 
-    private boolean addTable(CyNode node, CyNetwork network, boolean useParser) {
+    private void addTable(CyNode node, CyNetwork network, boolean useParser) {
         String mainNode = network.getDefaultNodeTable().getRow(node.getSUID()).get("name", String.class);
         if (!funManager.nodeTableIsEmpty()) {
             if (funManager.containsNode(mainNode)) {
                 JOptionPane.showMessageDialog(null, "You already set function for this Node");
-                return false;
+                return;
             }
         }
 
         List<CyEdge> incomingEdges = network.getAdjacentEdgeList(node, CyEdge.Type.INCOMING);
-        if (incomingEdges.isEmpty()) return false;
+        if (incomingEdges.isEmpty()) return;
         int n = incomingEdges.size();
 
         Object[] columnsHeader = new String[n + 1];
@@ -251,13 +286,11 @@ public class FunctionsPanel extends JPanel implements CytoPanelComponent, Sessio
         String[] arguments = Arrays.copyOfRange((String[]) columnsHeader, 0, columnsHeader.length - 1);
 
         if (!useParser) {
-            for (int i = 0; i < values.length; i++)
-                values[i] = 0;
+            Arrays.fill(values, 0);
 
             funManager.addNodeTable(arguments, (String) columnsHeader[columnsHeader.length - 1]);
 
             initTable((String[]) columnsHeader, values);
-            return true;
         } else {
             boolean exitFlag = false;
 
@@ -296,17 +329,16 @@ public class FunctionsPanel extends JPanel implements CytoPanelComponent, Sessio
             }
             funManager.addNodeTable(arguments, (String) columnsHeader[n], values);
             initTable((String[]) columnsHeader, values);
-            return true;
         }
     }
 
-    private boolean initTable(String[] columnsHeader, Integer[] values) {
+    private void initTable(String[] columnsHeader, Integer[] values) {
         DefaultTableModel tableModel = new DefaultTableModel() {
             private static final long serialVersionUID = 199459756891294L;
 
             @Override
             public boolean isCellEditable(int i, int j) {
-                return (j == this.getColumnCount() - 1) ? true : false;
+                return j == this.getColumnCount() - 1;
             }
         };
 
@@ -334,7 +366,6 @@ public class FunctionsPanel extends JPanel implements CytoPanelComponent, Sessio
 
 
         this.repaint();
-        return true;
     }
 
     private void setDefaultValues(DefaultTableModel model) {
@@ -390,7 +421,6 @@ public class FunctionsPanel extends JPanel implements CytoPanelComponent, Sessio
         return null;
     }
 
-    @SuppressWarnings("rawtypes")
     @Override
     public void handleEvent(SessionAboutToBeSavedEvent e) {
         String tmpDir = System.getProperty("java.io.tmpdir");
@@ -413,7 +443,7 @@ public class FunctionsPanel extends JPanel implements CytoPanelComponent, Sessio
             ex.printStackTrace();
         }
 
-        ArrayList<File> files = new ArrayList<File>();
+        ArrayList<File> files = new ArrayList<>();
         files.add(tableFile);
         try {
             e.addAppFiles("Network_Functions", files);
